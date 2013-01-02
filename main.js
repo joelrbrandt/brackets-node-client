@@ -22,16 +22,24 @@
  */
 
 
-/*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50 */
-/*global define, brackets */
+/*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4,
+maxerr: 50, browser: true */
+/*global $, define, brackets, setInterval, clearInterval */
 
 define(function (require, exports, module) {
     "use strict";
 
-    var AppInit = brackets.getModule("utils/AppInit"),
-        Menus = brackets.getModule("command/Menus"),
-        CommandManager = brackets.getModule("command/CommandManager");
+    var AppInit        = brackets.getModule("utils/AppInit"),
+        Menus          = brackets.getModule("command/Menus"),
+        CommandManager = brackets.getModule("command/CommandManager"),
+        ExtensionUtils = brackets.getModule("utils/ExtensionUtils");
     
+    // Hang NodeConnection constructor off of brackets so that other
+    // extensions can access it
+    var NodeConnection = brackets.NodeConnection = require("NodeConnection");
+    
+    var _nodeConnection = null;
+    var _nodeLog = [];
 
     function showNodeState() {
         if (brackets.app && brackets.app.getNodeState) {
@@ -47,16 +55,79 @@ define(function (require, exports, module) {
         }
     }
     
-    // load everything when brackets is done loading
+    function restart() {
+        try {
+            _nodeConnection.domains.base.restartNode();
+        } catch (e) {
+            alert("Failed trying to restart Node: " + e.message);
+        }
+    }
+    
+    function enableDebugger() {
+        try {
+            _nodeConnection.domains.base.enableDebugger();
+        } catch (e) {
+            alert("Failed trying to enable Node debugger: " + e.message);
+        }
+    }
+    
+    function showLog() {
+        alert(JSON.stringify(_nodeLog, null, "  "));
+    }
+    
     AppInit.appReady(function () {
-        var ID_SHOW_NODE_STATE = "jrb.node.showNodeState";
-        var NAME_SHOW_NODE_STATE = "Show Node State";
-
-        CommandManager.register(NAME_SHOW_NODE_STATE, ID_SHOW_NODE_STATE, showNodeState);
+        _nodeConnection = new NodeConnection();
+        _nodeConnection.connect(true);
+        $(_nodeConnection).on(
+            "base.log",
+            function (evt, level, timestamp, message) {
+                _nodeLog.push({
+                    level: level,
+                    timestamp: timestamp,
+                    message: message
+                });
+            }
+        );
+        
+        var ID_NODE_SHOW_STATE        = "brackets.node.showState";
+        var NAME_NODE_SHOW_STATE      = "Show Node State";
+        
+        var ID_NODE_RESTART           = "brackets.node.restart";
+        var NAME_NODE_RESTART         = "Restart Node";
+        
+        var ID_NODE_ENABLE_DEBUGGER   = "brackets.node.enableDebugger";
+        var NAME_NODE_ENABLE_DEBUGGER = "Enable Node Debugger";
+        
+        var ID_NODE_SHOW_LOG          = "brackets.node.showLog";
+        var NAME_NODE_SHOW_LOG        = "Show Node Log";
+        
+        CommandManager.register(
+            NAME_NODE_SHOW_STATE,
+            ID_NODE_SHOW_STATE,
+            showNodeState
+        );
+        CommandManager.register(
+            NAME_NODE_RESTART,
+            ID_NODE_RESTART,
+            restart
+        );
+        CommandManager.register(
+            NAME_NODE_ENABLE_DEBUGGER,
+            ID_NODE_ENABLE_DEBUGGER,
+            enableDebugger
+        );
+        CommandManager.register(
+            NAME_NODE_SHOW_LOG,
+            ID_NODE_SHOW_LOG,
+            showLog
+        );
         
         var menu = Menus.getMenu(Menus.AppMenuBar.DEBUG_MENU);
         menu.addMenuItem(Menus.DIVIDER);
-        menu.addMenuItem(ID_SHOW_NODE_STATE);
+        menu.addMenuItem(ID_NODE_SHOW_STATE);
+        menu.addMenuItem(ID_NODE_RESTART);
+        menu.addMenuItem(ID_NODE_ENABLE_DEBUGGER);
+        menu.addMenuItem(ID_NODE_SHOW_LOG);
         
     });
 
