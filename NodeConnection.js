@@ -30,7 +30,7 @@ define(function (require, exports, module) {
     "use strict";
     
     var CONNECTION_ATTEMPTS = 10;
-    var CONNECTION_TIMEOUT  = 1000; // 1 second
+    var CONNECTION_TIMEOUT  = 5000; // 5 seconds
     var RETRY_DELAY         = 500;  // 1/2 second
     
     // Helper function to auto-reject a deferred after a given amount of time.
@@ -279,7 +279,8 @@ define(function (require, exports, module) {
                 }
                 break;
             case "error":
-                console.error("[NodeConnection] received error: " + m);
+                console.error("[NodeConnection] received error: " +
+                                m.message.message);
                 break;
             default:
                 console.error("[NodeConnection] unknown event type: " + m.type);
