@@ -30,8 +30,14 @@ waitsFor, runs, $, brackets, waitsForDone */
 define(function (require, exports, module) {
     "use strict";
     
-    var CONNECTION_TIMEOUT = 5000;   // 2.5 seconds
-    var RESTART_SERVER_DELAY = 5000; // five seconds
+    // Windows sockets are slow to realize they've disconnected (or failed
+    // to connect, so the unit tests that rely on checking disconnect/reconnect
+    // need a longe timeout. To make sure that unit tests run as fast as
+    // possible, we should make sure that any waitsFor functions that use this
+    // timeout are expected to succeed in waiting (i.e. return "true" as fast
+    // as possible).
+    var CONNECTION_TIMEOUT      = 30000;  // 30 seconds
+    var RESTART_SERVER_DELAY    = 5000;  // five seconds
     
     var ExtensionUtils = brackets.getModule("utils/ExtensionUtils");
     var NodeConnection = require("NodeConnection");
@@ -263,7 +269,7 @@ define(function (require, exports, module) {
             runConnectAndWait(connection, false);
             runLoadDomainsAndWait(connection, ["TestCommandsOne"], false);
             runs(function () {
-                connection._ws.send("not a message");
+                connection._ws.send("EXPECTED ERROR FROM UNIT TEST");
                 commandDeferred = connection.domains.test.reverse("asdf");
                 commandDeferred.done(function (response) {
                     result = response;

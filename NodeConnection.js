@@ -30,9 +30,14 @@ define(function (require, exports, module) {
     "use strict";
     
     var CONNECTION_ATTEMPTS = 10;
-    var CONNECTION_TIMEOUT  = 5000; // 5 seconds
-    var RETRY_DELAY         = 500;  // 1/2 second
-    
+    var CONNECTION_TIMEOUT  = 10000; // 10 seconds
+    var RETRY_DELAY         = 500;   // 1/2 second
+    // NOTE: It's okay for the connection timeout to be long because the
+    // expected behavior of WebSockets is to send a "close" event as soon
+    // as they realize they can't connect. So, we should rarely hit the
+    // connection timeout even if we try to connect to a port that isn't open.
+
+
     // Helper function to auto-reject a deferred after a given amount of time.
     // If the deferred is resolved/rejected manually, then the timeout is
     // automatically cleared.
@@ -56,7 +61,7 @@ define(function (require, exports, module) {
                 ws = new WebSocket("ws://localhost:" + port);
                 
                 // If the server port isn't open, we get a close event
-                // on the next process tick (and will not get an onopen 
+                // at some point in the future (and will not get an onopen 
                 // event)
                 ws.onclose = function () {
                     deferred.reject();
@@ -228,7 +233,21 @@ define(function (require, exports, module) {
         }
 
         if (this.domains.base && this.domains.base.loadDomainModulesFromPaths) {
-            this.domains.base.loadDomainModulesFromPaths(pathArray);
+            this.domains.base.loadDomainModulesFromPaths(pathArray).then(
+                function (success) { // command call succeeded
+                    if (!success) {
+                        // response from commmand call was "false" so we know
+                        // the actual load failed.
+                        deferred.reject();
+                    }
+                    // if the load succeeded, we wait for the API refresh to
+                    // resolve the deferred.
+                },
+                function () { // command call failed
+                    deferred.reject();
+                }
+            );
+
             this._pendingInterfaceRefreshDeferreds.push(deferred);
         } else {
             deferred.reject();
