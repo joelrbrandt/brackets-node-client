@@ -22,17 +22,51 @@
  */
 
 
-/*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4, maxerr: 50 */
-/*global define, brackets */
+/*jslint vars: true, plusplus: true, devel: true, nomen: true, indent: 4,
+maxerr: 50, browser: true */
+/*global $, define, brackets, setInterval, clearInterval */
+
+/* 
+ * TODO: Eventually, we should probably bring NodeConnection.js and the
+ * unit tests in to core. We may throw this out. If we keep this, we
+ * should make better UIs for the menu commands. Right now they just
+ * pop up alert()s.
+ */
 
 define(function (require, exports, module) {
     "use strict";
 
-    var AppInit = brackets.getModule("utils/AppInit"),
-        Menus = brackets.getModule("command/Menus"),
-        CommandManager = brackets.getModule("command/CommandManager");
-    
+    var AppInit        = brackets.getModule("utils/AppInit"),
+        Menus          = brackets.getModule("command/Menus"),
+        CommandManager = brackets.getModule("command/CommandManager"),
+        ExtensionUtils = brackets.getModule("utils/ExtensionUtils");
 
+    /**
+     * @constructor
+     * Provides an interface for interacting with the node server.
+     * Defined in NodeConnection.js. hHg off of brackets global so that
+     * other extensions can access it.
+     */
+    var NodeConnection = brackets.NodeConnection = require("NodeConnection");
+    
+    /**
+     * @private
+     * @type{NodeConnection}
+     * Connection to node for executing commands like enableDebugger
+     */
+    var _nodeConnection = null;
+
+    /**
+     * @private
+     * @type{Array.<{level: string, timestamp: Date, message: string}>}
+     * History of all log messages received from node
+     */
+    var _nodeLog = [];
+
+    /**
+     * @private
+     * Handler for menu command to show the state of the current node server.
+     */
     function showNodeState() {
         if (brackets.app && brackets.app.getNodeState) {
             brackets.app.getNodeState(function (err, port) {
@@ -47,16 +81,91 @@ define(function (require, exports, module) {
         }
     }
     
-    // load everything when brackets is done loading
-    AppInit.appReady(function () {
-        var ID_SHOW_NODE_STATE = "jrb.node.showNodeState";
-        var NAME_SHOW_NODE_STATE = "Show Node State";
+    /**
+     * @private
+     * Handler for menu command to restart node.
+     */
+    function restart() {
+        try {
+            _nodeConnection.domains.base.restartNode();
+        } catch (e) {
+            alert("Failed trying to restart Node: " + e.message);
+        }
+    }
 
-        CommandManager.register(NAME_SHOW_NODE_STATE, ID_SHOW_NODE_STATE, showNodeState);
+    /**
+     * @private
+     * Handler for menu command to enable the node debugger.
+     */
+    function enableDebugger() {
+        try {
+            _nodeConnection.domains.base.enableDebugger();
+        } catch (e) {
+            alert("Failed trying to enable Node debugger: " + e.message);
+        }
+    }
+
+    /**
+     * @private
+     * Handler for menu command to show the node log.
+     */
+    function showLog() {
+        alert(JSON.stringify(_nodeLog, null, "  "));
+    }
+    
+    AppInit.appReady(function () {
+        _nodeConnection = new NodeConnection();
+        _nodeConnection.connect(true);
+        $(_nodeConnection).on(
+            "base.log",
+            function (evt, level, timestamp, message) {
+                _nodeLog.push({
+                    level: level,
+                    timestamp: timestamp,
+                    message: message
+                });
+            }
+        );
+        
+        var ID_NODE_SHOW_STATE        = "brackets.node.showState";
+        var NAME_NODE_SHOW_STATE      = "Show Node State";
+        
+        var ID_NODE_RESTART           = "brackets.node.restart";
+        var NAME_NODE_RESTART         = "Restart Node";
+        
+        var ID_NODE_ENABLE_DEBUGGER   = "brackets.node.enableDebugger";
+        var NAME_NODE_ENABLE_DEBUGGER = "Enable Node Debugger";
+        
+        var ID_NODE_SHOW_LOG          = "brackets.node.showLog";
+        var NAME_NODE_SHOW_LOG        = "Show Node Log";
+        
+        CommandManager.register(
+            NAME_NODE_SHOW_STATE,
+            ID_NODE_SHOW_STATE,
+            showNodeState
+        );
+        CommandManager.register(
+            NAME_NODE_RESTART,
+            ID_NODE_RESTART,
+            restart
+        );
+        CommandManager.register(
+            NAME_NODE_ENABLE_DEBUGGER,
+            ID_NODE_ENABLE_DEBUGGER,
+            enableDebugger
+        );
+        CommandManager.register(
+            NAME_NODE_SHOW_LOG,
+            ID_NODE_SHOW_LOG,
+            showLog
+        );
         
         var menu = Menus.getMenu(Menus.AppMenuBar.DEBUG_MENU);
         menu.addMenuItem(Menus.DIVIDER);
-        menu.addMenuItem(ID_SHOW_NODE_STATE);
+        menu.addMenuItem(ID_NODE_SHOW_STATE);
+        menu.addMenuItem(ID_NODE_RESTART);
+        menu.addMenuItem(ID_NODE_ENABLE_DEBUGGER);
+        menu.addMenuItem(ID_NODE_SHOW_LOG);
         
     });
 
