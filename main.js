@@ -26,6 +26,13 @@
 maxerr: 50, browser: true */
 /*global $, define, brackets, setInterval, clearInterval */
 
+/* 
+ * TODO: Eventually, we should probably bring NodeConnection.js and the
+ * unit tests in to core. We may throw this out. If we keep this, we
+ * should make better UIs for the menu commands. Right now they just
+ * pop up alert()s.
+ */
+
 define(function (require, exports, module) {
     "use strict";
 
@@ -33,14 +40,33 @@ define(function (require, exports, module) {
         Menus          = brackets.getModule("command/Menus"),
         CommandManager = brackets.getModule("command/CommandManager"),
         ExtensionUtils = brackets.getModule("utils/ExtensionUtils");
-    
-    // Hang NodeConnection constructor off of brackets so that other
-    // extensions can access it
+
+    /**
+     * @constructor
+     * Provides an interface for interacting with the node server
+     * Defined in NodeConnection.js. hug off of brackets global so that
+     * other extensions can access it.
+     */
     var NodeConnection = brackets.NodeConnection = require("NodeConnection");
     
+    /**
+     * @private
+     * @type{NodeConnection}
+     * Connection to node for executing commands like enableDebugger
+     */
     var _nodeConnection = null;
+
+    /**
+     * @private
+     * @type{Array.<{level: string, timestamp: Date, message: string}>}
+     * History of all log messages received from node
+     */ 
     var _nodeLog = [];
 
+    /**
+     * @private
+     * Handler for menu command to show the state of the current node server.
+     */
     function showNodeState() {
         if (brackets.app && brackets.app.getNodeState) {
             brackets.app.getNodeState(function (err, port) {
@@ -55,6 +81,10 @@ define(function (require, exports, module) {
         }
     }
     
+    /**
+     * @private
+     * Handler for menu command to restart node.
+     */
     function restart() {
         try {
             _nodeConnection.domains.base.restartNode();
@@ -62,7 +92,11 @@ define(function (require, exports, module) {
             alert("Failed trying to restart Node: " + e.message);
         }
     }
-    
+
+    /**
+     * @private
+     * Handler for menu command to enable the node debugger.
+     */
     function enableDebugger() {
         try {
             _nodeConnection.domains.base.enableDebugger();
@@ -70,7 +104,11 @@ define(function (require, exports, module) {
             alert("Failed trying to enable Node debugger: " + e.message);
         }
     }
-    
+
+    /**
+     * @private
+     * Handler for menu command to show the node log.
+     */
     function showLog() {
         alert(JSON.stringify(_nodeLog, null, "  "));
     }
